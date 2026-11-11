@@ -241,11 +241,17 @@ class SourceShell:
         self._ignore_duplicates = ignore_duplicates
         self._show_original_label = show_original_label
         self._raw_labels: list[str] = []
+        self._notifications: list[str] = []
 
     @property
     def raw_labels(self) -> list[str]:
         """Original provider labels seen in the last fetch (#7444)."""
         return self._raw_labels
+
+    @property
+    def notifications(self) -> list[str]:
+        """Notices produced by the source's last successful fetch."""
+        return list(self._notifications)
 
     @property
     def refreshtime(self):
@@ -285,6 +291,7 @@ class SourceShell:
                 f"fetch failed for source {self._title}:\n{traceback.format_exc()}"
             )
             return False
+        self._notifications = list(getattr(self._source, "notifications", ()))
         self._refreshtime = datetime.datetime.now()
 
         # Strip incidental whitespace from legacy sources' raw type strings.

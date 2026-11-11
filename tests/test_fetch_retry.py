@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import date, timedelta
 from threading import Event
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -17,6 +18,58 @@ sys.path.append(
 from waste_collection_schedule import Collection  # isort:skip
 from waste_collection_schedule.source_shell import SourceShell  # isort:skip
 from waste_collection_schedule.waste_types import PAPER  # isort:skip
+
+
+def test_source_shell_carries_notifications_from_a_successful_fetch() -> None:
+    class _Source:
+        def __init__(self) -> None:
+            self.notifications = ["schedule changed"]
+
+        def fetch(self):
+            return [Collection(date=date(2026, 7, 20), t="Test collection")]
+
+    shell = SourceShell(
+        _Source(), {}, "Test source", "Test source", None, None, "notice", 0
+    )
+
+    assert shell.fetch() is True
+    assert shell.notifications == ["schedule changed"]
+
+
+def test_coordinator_creates_and_dismisses_source_notification() -> None:
+    from custom_components.waste_collection_schedule import wcs_coordinator
+
+    coordinator = object.__new__(wcs_coordinator.WCSCoordinator)
+    coordinator.config_entry = SimpleNamespace(entry_id="entry")
+    coordinator._hass = Mock()
+    coordinator._shell = cast(
+        Any,
+        SimpleNamespace(title="Test source", notifications=["schedule changed"]),
+    )
+
+    with (
+        patch.object(wcs_coordinator.persistent_notification, "async_create") as create,
+        patch.object(
+            wcs_coordinator.persistent_notification, "async_dismiss"
+        ) as dismiss,
+    ):
+        coordinator._update_source_notification()
+        create.assert_called_once_with(
+            coordinator._hass,
+            "schedule changed",
+            title="Test source schedule update",
+            notification_id="waste_collection_schedule_entry_source_notice",
+        )
+        dismiss.assert_not_called()
+
+        coordinator._shell = cast(
+            Any, SimpleNamespace(title="Test source", notifications=[])
+        )
+        coordinator._update_source_notification()
+        dismiss.assert_called_once_with(
+            coordinator._hass,
+            notification_id="waste_collection_schedule_entry_source_notice",
+        )
 
 
 def test_source_shell_fetch_reports_success_and_failure() -> None:

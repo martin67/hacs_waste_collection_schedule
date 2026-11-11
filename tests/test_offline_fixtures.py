@@ -150,6 +150,29 @@ def test_offline_replay(module_name, case_slug, path, offline_throttle):
     _COMPLETED.add(os.path.abspath(path))
 
 
+def test_danderyd_mobile_prefers_monthly_location_and_reports_pdf_difference():
+    module_name = "danderyd_mobil_atervinningscentral_se"
+    cls, args = _resolve_case(module_name, "danderyd")
+    assert cls is not None
+    path = next(
+        path
+        for module, case, path in _FIXTURES
+        if module == module_name and case == "danderyd"
+    )
+    source = cls(**args)
+
+    with cassette.replaying(path):
+        events = source.fetch()
+
+    event = next(event for event in events if event.date == datetime.date(2026, 11, 15))
+    assert event.location == (
+        "Baldersskolan, parkeringen med infart mot Vilans väg"  # codespell:ignore mot
+    )
+    assert event.description == "Öppet 11.00–14.00"
+    assert len(source.notifications) == 1
+    assert "PDF-schemat anger Balderskolan" in source.notifications[0]
+
+
 @pytest.mark.parametrize(
     "module_name,case_slug,path",
     _ERROR_FIXTURES,

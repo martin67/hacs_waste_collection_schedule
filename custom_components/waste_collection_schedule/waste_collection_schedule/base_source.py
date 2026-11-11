@@ -230,6 +230,7 @@ class BaseSource(ABC, Generic[ParserType, TransformerType]):
         validate(self.PARAMS, prepared)
         self.params: dict[str, Any] = prepared
         self._session: Any = None
+        self.notifications: list[str] = []
 
     @property
     def session(self) -> Any:
@@ -261,6 +262,7 @@ class BaseSource(ABC, Generic[ParserType, TransformerType]):
         responses (pagination); a parser consuming the latter controls how many
         pages are actually fetched by how far it iterates.
         """
+        self.notifications.clear()
         raw = self.retrieve(self)
         records = self.parse(raw, self)
 

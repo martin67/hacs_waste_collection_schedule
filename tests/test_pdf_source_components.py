@@ -3143,6 +3143,28 @@ def test_nkom_schedule_lookup_selects_the_latest_pdf_for_each_waste_group():
     ]
 
 
+def test_danderyd_schedule_comparison_ignores_case_and_reports_location_changes():
+    from waste_collection_schedule.service.DanderydMobile import DanderydMobileParser
+    from waste_collection_schedule.service.ICS import IcsEvent
+
+    month = (2026, 11)
+    date = D(2026, 11, 22)
+    monthly = [
+        IcsEvent(date, "Mobile recycling", "Pendelparkeringen vid Mörbybadet", None)
+    ]
+    annual = [
+        IcsEvent(date, "Mobile recycling", "pendelparkeringen vid Mörbybadet", None)
+    ]
+
+    assert DanderydMobileParser._compare(monthly, annual, month) == []
+
+    annual[0] = IcsEvent(date, "Mobile recycling", "Stocksunds IP", None)
+    notices = DanderydMobileParser._compare(monthly, annual, month)
+    assert len(notices) == 1
+    assert "2026-11-22" in notices[0]
+    assert "Stocksunds IP" in notices[0]
+
+
 def test_nkom_schedule_lookup_reports_missing_pdf_links_as_shape_error():
     from waste_collection_schedule.source.nkom_lt import _schedule_links
 

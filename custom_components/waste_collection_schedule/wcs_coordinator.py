@@ -8,6 +8,7 @@ from random import randrange
 from typing import Any
 
 import homeassistant.util.dt as dt_util
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -334,6 +335,7 @@ class WCSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._shell._entries = previous.shell._entries
                 self._shell._sensor_entries = previous.shell._sensor_entries
                 self._shell._raw_labels = previous.shell._raw_labels
+                self._shell._notifications = previous.shell._notifications
                 self._shell._refreshtime = previous.shell._refreshtime
                 self._last_fetch_date = previous.shell.refreshtime.date()
                 self._fetch_state.last_success = None
@@ -368,6 +370,8 @@ class WCSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # fills the cache for the setup retry; not once superseded.
                 if fetch_succeeded:
                     self._fetch_state.last_success = self
+                    if not self._superseded:
+                        self._update_source_notification()
                     async with self._fetch_state.cache_lock:
                         if not self._superseded:
                             await self._store.async_save(
@@ -398,3 +402,18 @@ class WCSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return fetch_succeeded if self.shell else True
         finally:
             self._fetch_lock.release()
+
+    def _update_source_notification(self) -> None:
+        notification_id = f"{const.DOMAIN}_{self.config_entry.entry_id}_source_notice"
+        messages = self.shell.notifications
+        if messages:
+            persistent_notification.async_create(
+                self._hass,
+                "\n\n".join(messages),
+                title=f"{self.shell.title} schedule update",
+                notification_id=notification_id,
+            )
+        else:
+            persistent_notification.async_dismiss(
+                self._hass, notification_id=notification_id
+            )
